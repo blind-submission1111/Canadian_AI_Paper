@@ -1,0 +1,672 @@
+{
+    "num_api_workers": 8,
+    "tasks": [
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            },
+            "mode": "baseline"
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            },
+            "mode": "baseline"
+        },
+        {
+            "target_model": "claude-3-7-sonnet-20250219",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            },
+            "mode": "baseline"
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "claude-3-7-sonnet-20250219",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "claude-3-7-sonnet-20250219",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "claude-3-7-sonnet-20250219",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_addition_equation_split_reassemble"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_addition_equation_split_reassemble"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "claude-3-7-sonnet-20250219",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_addition_equation_split_reassemble"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_conditional_probability"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_conditional_probability"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "claude-3-7-sonnet-20250219",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_conditional_probability"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_symbol_injection"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_symbol_injection"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "claude-3-7-sonnet-20250219",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_symbol_injection"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain",
+                "rephrase_first": true
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_rephrase"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_rephrase"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o-mini",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_rephrase"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_rephrase"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        }
+    ]
+}

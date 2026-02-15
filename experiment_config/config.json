@@ -1,0 +1,170 @@
+{
+  "num_api_workers": 8,
+  "tasks": [
+    {
+      "target_model": "gpt-4o-mini",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/harmbench_standard/20260213_172138_8188322_llm_set_theory_harmbench_standard_gpt-4o-mini_normal"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gemini-2.0-flash",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/harmbench_standard/20260213_172138_8528318_llm_set_theory_harmbench_standard_gemini-2.0-flash_normal"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gemini-2.0-flash",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/jailbreakbench/20260214_013554_2972424_llm_formal_logic_jailbreakbench_gemini-2.0-flash"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-4o-mini",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "llm_formal_logic"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gemini-2.0-flash",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "llm_formal_logic"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-4o-mini",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "llm_formal_logic"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gemini-2.0-flash",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "llm_formal_logic"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "claude-3-7-sonnet-20250219",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/harmbench_standard/20260213_091210_1406438_llm_set_theory_harmbench_standard_claude-3-7-sonnet-20250219_normal"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gemini-2.0-flash",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/harmbench_standard/20260213_172139_3404199_llm_formal_logic_harmbench_standard_gemini-2.0-flash_normal"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gemini-2.0-flash",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/harmbench_standard/20260213_091210_4876055_llm_quantum_mechanics_harmbench_standard_gemini-2.0-flash_normal"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-4o-mini",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/jailbreakbench/20260214_013554_716668_llm_set_theory_jailbreakbench_gpt-4o-mini"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "claude-3-7-sonnet-20250219",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/jailbreakbench/20260214_013554_8173969_llm_set_theory_jailbreakbench_claude-3-7-sonnet-20250219"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gemini-2.0-flash",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "non_llm_repeat",
+        "experiment_dir": "src/data/experiment_data/jailbreakbench/20260214_013554_5938710_llm_set_theory_jailbreakbench_gemini-2.0-flash"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    }
+  ]
+}

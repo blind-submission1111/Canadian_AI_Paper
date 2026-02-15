@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "prompt_processing_by_maths_for_LLM_jailbreaking"
+version = "0.1.0"
+description = "A framework for running experiments with LLMs"
+authors = ["Project Team <example@example.com>"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<4.0"
+pyarrow = "^21.0.0"
+google-genai = "^1.49.0"
+json-repair = "^0.57.1"
+
+
+[tool.poetry.group.dev.dependencies]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

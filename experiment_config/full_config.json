@@ -1,0 +1,218 @@
+{
+    "tasks": [
+        {
+            "name": "baseline_harmbench_gpt4o",
+            "target_model": "gpt-4o",
+            "mode": "baseline",
+            "dataloader": {
+                "dataset_name": "harmbench_standard",
+                "prompt_ids": null,
+                "max_samples": null
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "model_config": {
+                    "model": "gpt-4o-mini",
+                    "max_tokens": 16384,
+                    "temperature": 0.0,
+                    "top_p": 1.0,
+                    "seed": 42
+                },
+                "use_few_shot": true,
+                "num_parts": 6,
+                "num_symbols": 10,
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench",
+                "model_config": {
+                    "model": "gpt-4o",
+                    "max_tokens": 16384,
+                    "temperature": 0.0,
+                    "seed": 42
+                }
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_markov_chain",
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_quantum_mechanics",
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "non_llm_addition_equation_split_reassemble",
+                "num_parts": 6,
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "non_llm_conditional_probability",
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "non_llm_symbol_injection",
+                "num_symbols": 10,
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": true,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": false,
+                "repeat_mode": "partial"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": false,
+                "repeat_mode": "full"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "mode": "baseline",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "gpt-4o",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "jailbreakbench"
+            }
+        },
+        {
+            "target_model": "meta-llama/Llama-3.1-8B-Instruct",
+            "dataloader": {
+                "dataset_name": "harmbench_standard"
+            },
+            "processor": {
+                "strategy": "llm_set_theory",
+                "rephrase_first": false,
+                "repeat_mode": "none"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        }
+    ],
+    "cluster_server": {
+        "gpu_types_preferred": [
+            "v100-sxm2",
+            "a100",
+            "l40"
+        ],
+        "time_limit": "08:00:00",
+        "partition": "gpu"
+    }
+}

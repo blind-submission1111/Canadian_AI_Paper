@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables and secrets
+src/env_config.py
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursorignore
+
+
+# OS
+.DS_Store
+
+
+# custom
+private_files/
+other_repos/
+src/others' codes/
+dependency_bug_fix/
+nurc_cluster_files/
+human_and_ai_agent_interaction/
+my_old_data_and_experiments/
+cluster_files_and_commands/
+experiment_data/
+src/data/original_datasets/
+paper/
+logs/
+final_update_paper.py
+
+# Ignored Temporary Files
+.claude/
+TODO.md
+TODO_old.md
+old_test.py
+test.py
+progress_report.md
+records and explanations.md

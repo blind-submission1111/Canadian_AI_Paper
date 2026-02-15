@@ -1,0 +1,18 @@
+{
+    "num_api_workers": 1,
+    "tasks": [
+        {
+            "target_model": "gemini-2.0-flash",
+            "dataloader": {
+                "dataset_name": "jailbreakbench"
+            },
+            "processor": {
+                "strategy": "non_llm_repeat",
+                "experiment_dir": "src/data/experiment_data/jailbreakbench/20260214_013554_3335660_llm_formal_logic_jailbreakbench_gemini-2.0-flash"
+            },
+            "evaluation": {
+                "method": "harmbench"
+            }
+        }
+    ]
+}
