@@ -1,6 +1,7 @@
 """
 Base processor class and helper functions for all prompt processors.
 """
+import re
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
@@ -11,6 +12,15 @@ from src.utils.constants import PARALLEL_PROCESSING_THRESHOLD
 
 logger = get_logger(__name__)
 
+# Delimiter tags used by LLM processors to mark encoding vs instruction sections
+ENCODING_START_TAG = "[ENCODING]"
+ENCODING_END_TAG = "[/ENCODING]"
+INSTRUCTION_START_TAG = "[INSTRUCTION]"
+INSTRUCTION_END_TAG = "[/INSTRUCTION]"
+
+# Repeat transition phrase
+REPEAT_TRANSITION = "\n"
+
 
 class BaseProcessor(ABC):
     """
@@ -20,6 +30,10 @@ class BaseProcessor(ABC):
     Each processor must implement process() for single prompt transformation.
     The default batch_process() uses multiprocessing for efficiency.
     
+    Built-in pre/post processing:
+    - rephrase_first: If True, rephrases prompts via RephraseLLMProcessor before core processing.
+    - is_repeating: If True, repeats the output after core processing.
+    
     All processors accept an optional 'model' parameter for consistency,
     even if they don't use it (e.g., rule-based processors).
     
@@ -27,21 +41,40 @@ class BaseProcessor(ABC):
     DEFAULT_PROCESSING_MODEL from processors/constants.py (GPT-4o).
     """
     
-    def __init__(self, model: Optional[LLMModel] = None, **kwargs):
+    # Default prefix prepended to processed prompts when sent to target model.
+    # Override in subclasses for domain-specific framing.
+    TARGET_PREFIX: str = ""
+    
+    def __init__(
+        self,
+        model: Optional[LLMModel] = None,
+        rephrase_first: bool = False,
+        is_repeating: bool = False,
+        rephrase_model: Optional[LLMModel] = None,
+        **kwargs
+    ):
         """
         Initialize the processor.
         
         Args:
             model: Optional LLM model (used by LLM-based processors).
                   If None, LLM-based processors will use DEFAULT_PROCESSING_MODEL.
+            rephrase_first: If True, pre-process prompts through RephraseLLMProcessor
+                           before the core processing logic runs.
+            is_repeating: If True, repeat the entire output after core processing.
+            rephrase_model: Optional model for rephrasing. If None, uses DEFAULT_PROCESSING_MODEL.
             **kwargs: Processor-specific parameters
         """
         self.model = model
+        self.rephrase_first = rephrase_first
+        self.is_repeating = is_repeating
+        self.rephrase_model = rephrase_model
+        self._rephraser = None  # Lazy initialization
     
     @abstractmethod
     def process(self, prompt: str, **kwargs) -> str:
         """
-        Process a single prompt.
+        Process a single prompt (core logic).
         
         Args:
             prompt: The prompt to process
@@ -52,12 +85,33 @@ class BaseProcessor(ABC):
         """
         pass
     
+    def _apply_repeat(self, output: str) -> str:
+        """
+        Apply repeat post-processing to a single output.
+        
+        Args:
+            output: The processed output to repeat
+            
+        Returns:
+            Output with repetition applied
+        """
+        if self.is_repeating:
+            return output + REPEAT_TRANSITION + output
+        return output
+    
+    def _get_rephraser(self):
+        """Lazily create the rephrase processor."""
+        if self._rephraser is None:
+            from .processors.llm_rephrase_processor import RephraseLLMProcessor
+            self._rephraser = RephraseLLMProcessor(model=self.rephrase_model)
+            logger.info(f"Initialized rephraser for pre-processing (model: {self.rephrase_model})")
+        return self._rephraser
+    
     def batch_process(self, prompts: List[str], **kwargs) -> List[str]:
         """
-        Process multiple prompts efficiently.
+        Process multiple prompts with optional pre-step (rephrase) and post-step (repeat).
         
-        Default implementation uses multiprocessing for CPU-bound processors.
-        LLM-based processors should override this to use API batch calls.
+        Pipeline: [rephrase] -> core processing -> [repeat]
         
         Args:
             prompts: List of prompts to process
@@ -70,6 +124,44 @@ class BaseProcessor(ABC):
             logger.warning("No prompts to process")
             return []
         
+        # Pre-step: rephrase
+        if self.rephrase_first:
+            logger.info(f"Pre-step: Rephrasing {len(prompts)} prompts before core processing")
+            rephraser = self._get_rephraser()
+            prompts = rephraser._batch_process_core(prompts, **kwargs)
+            logger.info("Pre-step complete: Rephrasing done")
+        
+        # Core processing
+        results = self._batch_process_core(prompts, **kwargs)
+        
+        # Post-step: repeat
+        if self.is_repeating:
+            logger.info(f"Post-step: Applying repeat to {len(results)} outputs")
+            results = [self._apply_repeat(r) for r in results]
+            logger.info("Post-step complete: Repeat applied")
+        
+        # Prepend TARGET_PREFIX so the returned prompts are the complete
+        # text that should be sent to the target model.
+        if self.TARGET_PREFIX:
+            logger.info(f"Prepending TARGET_PREFIX ({len(self.TARGET_PREFIX)} chars) to processed prompts")
+            results = [self.TARGET_PREFIX + r for r in results]
+        
+        return results
+    
+    def _batch_process_core(self, prompts: List[str], **kwargs) -> List[str]:
+        """
+        Core batch processing logic (without pre/post steps).
+        
+        Default implementation uses multiprocessing for CPU-bound processors.
+        LLM-based processors should override this to use API batch calls.
+        
+        Args:
+            prompts: List of prompts to process
+            **kwargs: Processor-specific parameters
+            
+        Returns:
+            List of processed prompts/responses
+        """
         logger.info(f"Batch processing {len(prompts)} prompts")
         
         # For large batches, use multiprocessing
@@ -134,6 +226,22 @@ class BaseProcessor(ABC):
         except Exception as e:
             logger.error(f"Error in parallel processing: {str(e)}")
             return f"Error: {str(e)}"
+
+
+def strip_delimiter_tags(text: str) -> str:
+    """
+    Remove [ENCODING], [/ENCODING], [INSTRUCTION], [/INSTRUCTION] tags from text.
+    
+    Used by LLM processors to clean model output before returning.
+    """
+    text = text.replace(ENCODING_START_TAG, "")
+    text = text.replace(ENCODING_END_TAG, "")
+    text = text.replace(INSTRUCTION_START_TAG, "")
+    text = text.replace(INSTRUCTION_END_TAG, "")
+    # Clean up any resulting double-newlines from tag removal
+    while "\n\n\n" in text:
+        text = text.replace("\n\n\n", "\n\n")
+    return text.strip()
 
 
 def split_into_parts(words: list[str], num_parts: int) -> list[list[str]]:
@@ -213,4 +321,3 @@ def split_into_parts(words: list[str], num_parts: int) -> list[list[str]]:
     parts.append(words[current_idx:])
     
     return parts
-

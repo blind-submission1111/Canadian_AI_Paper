@@ -2,21 +2,19 @@
 Task - a unit experiment with specific configuration and execution logic.
 """
 import json
-from typing import Dict, Any, Optional, Union, List, Tuple
+import logging
+from typing import Dict, Any, Optional
 from pathlib import Path
 
-from src.llm_utils import LLMModel
-from src.evaluation import EvaluatorFactory, load_and_filter_prompts
+from src.llm_utils import LLMModel, Provider
+from src.evaluation import EvaluatorFactory
 from src.evaluation.constants import DEFAULT_EVALUATION_MODEL
-from src.evaluation import constants as eval_constants
-from src.prompt_processor import create_processor, ProcessorType
+from src.prompt_processor import create_processor
+from src.dataloader import load_dataset
 from src.utils.logger import get_logger
-from src.utils import generate_task_filename
-from src.experiment.constants import TASK_DATA_DIR, DEFAULT_TASK_NAME, DATASET_NAME_TO_PATH, DATASET_NAME_TO_EXPERIMENT_PATH
-from src.data.constants import ATA_HARMFUL_PROMPTS_FILE
-
-# Alias for backward compatibility in this file
-HARMFUL_PROMPTS_FILE = ATA_HARMFUL_PROMPTS_FILE
+from src.utils.experiment import get_new_experiment_data_dir
+from src.experiment.constants import TASK_DATA_DIR, DEFAULT_TASK_NAME
+from src.experiment.task_config import TaskConfig
 
 logger = get_logger(__name__)
 
@@ -26,173 +24,126 @@ class Task:
     A Task represents a single unit experiment with specific configuration.
     
     Each task has:
-    - Input data path (prompts to process)
+    - Dataset configuration (loaded via the dataloader)
     - Output data path (where to save results)
     - Evaluation model (for scoring responses)
-    - Processing strategy (how to transform prompts)
+    - Processing strategy (single processor per task)
     - Processing model (LLM for processing, if applicable)
     """
     
-    def __init__(
-        self,
-        processing_strategy: Union[
-            str, 
-            ProcessorType, 
-            List[Union[str, ProcessorType]],
-            List[Tuple[Union[str, ProcessorType], Optional[LLMModel]]]
-        ],
-        target_model: LLMModel,
-        evaluation_model: Optional[LLMModel] = None,
-        evaluation_method: str = "youjia",
-        mode: str = "normal",
-        baseline_result_dir: Optional[Union[str, Path]] = None,
-        name: Optional[str] = None,
-        input_data_path: Optional[Union[str, Path]] = None,
-        experiment_dir: Optional[Path] = None,
-        processing_model: Optional[LLMModel] = None,
-        prompt_ids: Optional[Union[Tuple[int, int], List[Union[int, str]]]] = None,
-        dataset_name: Optional[str] = None,
-        **strategy_kwargs
-    ):
+    def __init__(self, config: TaskConfig):
         """
-        Initialize a Task.
+        Initialize a Task from a TaskConfig.
         
         Args:
-            processing_strategy: Processor(s) to transform prompts.
-            target_model: Target LLM to test/jailbreak.
-            evaluation_model: LLM model for evaluation.
-            evaluation_method: Method to use ('youjia' or 'harmbench'). Default 'youjia'.
-            mode: Experiment mode ('normal' or 'baseline'). 
-                  'baseline': Only runs target model on original prompts and evaluates.
-                  'normal': Runs processing/jailbreak (and baseline if not provided).
-            baseline_result_dir: Path to directory containing previous baseline results to reuse.
-            name: Name of the task.
-            input_data_path: Path to input prompts file or dataset alias.
-            experiment_dir: Directory to save task results.
-            processing_model: LLM model for processing.
-            prompt_ids: Which prompts to test.
-            dataset_name: Name of the dataset being used (for directory organization).
-            **strategy_kwargs: Additional arguments for the processing strategy(s).
+            config: Complete task configuration.
         """
-        self.name = name or DEFAULT_TASK_NAME
-        self.dataset_name = dataset_name
-        
-        # Resolve input_data_path and dataset_name
-        if input_data_path:
-            # Check if it's a known dataset alias first
-            input_str = str(input_data_path)
-            if input_str in DATASET_NAME_TO_PATH:
-                self.input_data_path = DATASET_NAME_TO_PATH[input_str]
-                if not self.dataset_name:
-                    self.dataset_name = input_str
-            else:
-                self.input_data_path = Path(input_data_path)
+        self.config = config
+        # Auto-generate name if not provided
+        if config.name:
+            self.name = config.name
         else:
-            # Default to harmful prompts if nothing provided
-            self.input_data_path = HARMFUL_PROMPTS_FILE
-            if not self.dataset_name:
-                self.dataset_name = "ata_harmful"
-            
+            model_short = config.target_model.model_id.split('/')[-1].lower()
+            parts = [config.processor.strategy, config.dataloader.dataset_name, model_short]
+            if config.processor.rephrase_first:
+                parts.append("rephrase")
+            if config.processor.is_repeating:
+                parts.append("repeat")
+            self.name = "_".join(parts)
+        self.dataset_name = config.dataloader.dataset_name
+        
         # Evaluation settings
-        self.evaluation_model = evaluation_model if evaluation_model is not None else DEFAULT_EVALUATION_MODEL
-        self.evaluation_method = evaluation_method
-        self.mode = mode.lower()
-        self.baseline_result_dir = Path(baseline_result_dir) if baseline_result_dir else None
+        self.evaluation_model = config.evaluation.model_config.model or DEFAULT_EVALUATION_MODEL
+        self.evaluation_method = config.evaluation.method
         
-        # Parse processing_strategy
-        self.processing_strategies = []
-        self.processor_models = []
+        # Processing settings (single strategy)
+        self.strategy = config.processor.strategy
+        self.processing_model = config.processor.model_config.model
+        self.target_model = config.target_model
         
-        if isinstance(processing_strategy, (str, ProcessorType)):
-            self.processing_strategies = [processing_strategy]
-            self.processor_models = [processing_model]
-        else:
-            strategy_list = list(processing_strategy)
-            for item in strategy_list:
-                if isinstance(item, tuple):
-                    proc_type, proc_model = item
-                    self.processing_strategies.append(proc_type)
-                    if proc_model is not None and isinstance(proc_model, LLMModel):
-                        self.processor_models.append(proc_model)
-                    else:
-                        self.processor_models.append(processing_model)
-                else:
-                    self.processing_strategies.append(item)
-                    self.processor_models.append(processing_model)
-        
-        self.processing_model = processing_model
-        self.target_model = target_model
-        self.prompt_ids = prompt_ids
-        self.strategy_kwargs = strategy_kwargs
-        
-        # Set up experiment directory path
-        if experiment_dir:
-            self.experiment_dir = Path(experiment_dir)
-        else:
-            # Determine base directory based on dataset
-            base_dir = TASK_DATA_DIR
-            if self.dataset_name and self.dataset_name in DATASET_NAME_TO_EXPERIMENT_PATH:
-                base_dir = DATASET_NAME_TO_EXPERIMENT_PATH[self.dataset_name]
-            
-            # Create a unique timestamped folder name
-            folder_name = generate_task_filename(self.name).replace('.jsonl', '')
-            self.experiment_dir = base_dir / folder_name
+        # Set up experiment directory: experiment_data/{dataset_name}/{timestamp}_{task_name}/
+        base_dir = TASK_DATA_DIR / self.dataset_name
+        self.experiment_dir = Path(get_new_experiment_data_dir(
+            experiment_dir=str(base_dir),
+            dataset=None,  # Already in the path via base_dir
+            model=self.name,
+        ))
         
         # Lazy initialization
         self.evaluator = None
-        self.processors = None
+        self.processor = None
         
         # Results storage
         self.results: Dict[str, Any] = {}
         
-        logger.info(f"Initialized Task '{self.name}' (Mode: {self.mode})")
-        logger.info(f"Dataset: {self.dataset_name}, Experiment Dir: {self.experiment_dir}")
+        logger.info(f"Initialized Task '{self.name}'")
+        logger.info(f"Dataset: {self.dataset_name}, Strategy: {self.strategy}")
+        logger.info(f"Experiment Dir: {self.experiment_dir}")
+
+    @property
+    def requires_cluster(self) -> bool:
+        """True if any model in this task needs a local/cluster GPU server."""
+        NON_API_PROVIDERS = {Provider.LOCAL, Provider.NU_CLUSTER}
+        models = [self.target_model, self.processing_model, self.evaluation_model]
+        return any(
+            isinstance(m, LLMModel) and m.provider in NON_API_PROVIDERS
+            for m in models
+            if m is not None
+        )
 
     def load_prompts(self) -> list[Dict[str, Any]]:
-        """Load prompts from input data path."""
-        return load_and_filter_prompts(self.input_data_path, self.prompt_ids)
-    
-    def _load_baseline_results(self) -> Optional[Dict[str, Any]]:
-        """Load baseline results from detailed_results.jsonl in baseline_result_dir."""
-        if not self.baseline_result_dir:
-            return None
-            
-        detailed_file = self.baseline_result_dir / "detailed_results.jsonl"
-        if not detailed_file.exists():
-            logger.warning(f"Baseline results file not found at {detailed_file}")
-            return None
-            
-        try:
-            results_list = []
-            with open(detailed_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if line.strip():
-                        results_list.append(json.loads(line))
-            
-            logger.info(f"Loaded {len(results_list)} baseline results from {self.baseline_result_dir}")
-            return {'results': results_list}
-        except Exception as e:
-            logger.error(f"Failed to load baseline results: {e}")
-            return None
+        """Load prompts via the dataloader using the DataLoaderConfig."""
+        return load_dataset(self.config.dataloader)
 
     def run_task(self) -> Dict[str, Any]:
         """Execute the task."""
         logger.info(f"\n{'='*60}")
         logger.info(f"Running Task: {self.name}")
-        logger.info(f"Mode: {self.mode}")
         logger.info(f"{'='*60}\n")
         
         # Step 1: Create experiment directory
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Experiment directory: {self.experiment_dir}")
         
-        # Step 2: Load prompts
+        # Set up file logging to task.log in experiment directory
+        log_file = self.experiment_dir / "task.log"
+        file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(logging.Formatter(
+            fmt='[%(levelname)s] %(asctime)s - %(name)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
+        # Add file handler to root logger so all loggers write to the file
+        logging.root.addHandler(file_handler)
+        
+        try:
+            return self._execute_task()
+        finally:
+            # Clean up file handler
+            file_handler.flush()
+            file_handler.close()
+            logging.root.removeHandler(file_handler)
+            logger.info(f"Task log saved to {log_file}")
+
+    def _execute_task(self) -> Dict[str, Any]:
+        """Internal task execution logic.
+        
+        Pipeline:
+          1. Load prompts from dataset
+          2. Process prompts through processor
+          3. Generate target model responses
+          4. Evaluate (classify) responses
+          5. Save results
+        """
+        from src.llm_utils import LLMServiceFactory
+        
+        # Step 1: Load prompts via dataloader
         prompts = self.load_prompts()
         if not prompts:
             logger.error("No prompts loaded")
             return {}
         
-        logger.info(f"Loaded {len(prompts)} prompts from: {self.input_data_path}")
+        logger.info(f"Loaded {len(prompts)} prompts from dataset: {self.dataset_name}")
         
         if not self.target_model:
             logger.error("No target model specified")
@@ -204,196 +155,106 @@ class Task:
                 method=self.evaluation_method,
                 model=self.evaluation_model
             )
-            
-        # Determine baseline results (reuse if normal mode and dir provided)
-        baseline_results = None
-        if self.mode == "normal" and self.baseline_result_dir:
-            baseline_results = self._load_baseline_results()
         
-        # Step 3: Process Prompts & Run
+        # Determine prompt IDs
+        prompt_ids = [str(p.get('id', i)) for i, p in enumerate(prompts)]
         
-        if self.mode == "baseline":
-            # In baseline mode, we skip processing and just evaluate original prompts
-            # We treat original prompts as "processed" prompts so the evaluator runs them
-            processed_texts = [p['prompt'] for p in prompts]
-            
-            # Since processed == original, step 2 (jailbreak) in evaluator will mirror step 1 (baseline)
-            # This is fine; we will just save the baseline parts suitable for reuse
-            logger.info("Running in BASELINE mode (skipping prompt processing)")
-            evaluation_results = self.evaluator.evaluate_jailbreak_effectiveness(
-                prompts=prompts,
-                processed_prompts=processed_texts,
-                target_model=self.target_model
+        # Step 2: Process prompts through processor
+        proc_config = self.config.processor
+        
+        if self.processor is None:
+            self.processor = create_processor(
+                name=self.strategy,
+                model=self.processing_model,
+                rephrase_first=proc_config.rephrase_first,
+                is_repeating=proc_config.is_repeating,
+                temperature=proc_config.model_config.temperature,
+                max_tokens=proc_config.model_config.max_tokens,
+                use_few_shot=proc_config.use_few_shot,
+                num_parts=proc_config.num_parts,
+                num_symbols=proc_config.num_symbols,
+                experiment_dir=proc_config.experiment_dir,
             )
-            
-            # For result storage, we clear the redundant "jailbreak" data to avoid confusion
-            # Actually, let's keep it but mark the strategy as 'baseline'
-            processing_pipeline = [("baseline", None)]
-            strategy_str = "baseline"
-            all_stage_results = []
-
-        else:
-            # Normal mode: Run processing pipeline
-            if self.processors is None:
-                self.processors = []
-                for strategy, proc_model in zip(self.processing_strategies, self.processor_models):
-                    processor = create_processor(
-                        name=strategy,
-                        model=proc_model,
-                        **self.strategy_kwargs
-                    )
-                    self.processors.append(processor)
-            
-            prompt_texts = [p['prompt'] for p in prompts]
-            all_stage_results = []
-            
-            if len(self.processors) == 1:
-                logger.info(f"Processing {len(prompt_texts)} prompts with strategy: {self.processing_strategies[0]}")
-                processed_texts = self.processors[0].batch_process(prompt_texts)
-                all_stage_results.append(processed_texts)
-            else:
-                processed_texts = prompt_texts
-                for i, (processor, strategy) in enumerate(zip(self.processors, self.processing_strategies), 1):
-                    logger.info(f"  Stage {i}/{len(self.processors)}: Applying {strategy}")
-                    processed_texts = processor.batch_process(processed_texts)
-                    all_stage_results.append(processed_texts)
-            
-            # Run evaluation (passing baseline_results if available)
-            logger.info("Running evaluation...")
-            evaluation_results = self.evaluator.evaluate_jailbreak_effectiveness(
-                prompts=prompts,
-                processed_prompts=processed_texts,
-                target_model=self.target_model,
-                baseline_results=baseline_results
-            )
-            
-            processing_pipeline = [
-                (str(proc), model.value if model else None)
-                for proc, model in zip(self.processing_strategies, self.processor_models)
-            ]
-            strategy_str = " -> ".join([proc for proc, _ in processing_pipeline]) if len(processing_pipeline) > 1 else processing_pipeline[0][0]
-
-        # Step 5: Enrich results
-        final_results = []
         
-        for idx, eval_result in enumerate(evaluation_results['results']):
-            # Build list of processed prompts from each stage (for normal mode)
-            processed_prompts_list = []
-            for stage_results in all_stage_results:
-                if idx < len(stage_results):
-                    processed_prompts_list.append(stage_results[idx])
-            
-            final_results.append({
-                **eval_result,
-                'target_model': self.target_model.value,
-                'processing_strategy': strategy_str,
-                'processing_pipeline': processing_pipeline,
-                'processed_prompts': processed_prompts_list,
-            })
+        prompt_texts = [p['prompt'] for p in prompts]
         
-        self.results = {
-            'task_name': self.name,
-            'input_path': str(self.input_data_path),
-            'experiment_dir': str(self.experiment_dir),
-            'processing_strategy': strategy_str,
-            'processing_pipeline': processing_pipeline,
-            'processing_model': self.processing_model.value if self.processing_model else None,
-            'target_model': self.target_model.value,
-            'evaluation_model': self.evaluation_model.value,
-            'evaluation_method': self.evaluation_method,
-            'mode': self.mode,
-            'num_prompts': len(prompts),
-            'results': final_results,
-            'statistics': evaluation_results['statistics'],
-        }
+        logger.info(f"Processing {len(prompt_texts)} prompts with strategy: {self.strategy}")
+        if proc_config.rephrase_first:
+            logger.info("  Rephrase pre-step: enabled")
+        if proc_config.is_repeating:
+            logger.info("  Repeat post-step: enabled")
+        
+        processed_texts = self.processor.batch_process(prompt_texts)
+        strategy_str = str(self.strategy)
+        
+        # Step 3: Generate target model responses
+        logger.info(f"Generating responses from target model: {self.target_model.model_id}")
+        target_service = LLMServiceFactory.create(self.target_model)
+        target_inputs = [
+            (pid, proc_text)
+            for pid, proc_text in zip(prompt_ids, processed_texts)
+        ]
+        target_results = target_service.batch_generate(target_inputs)
+        response_dict = {pid: resp for pid, resp in target_results}
+        
+        # Step 4: Evaluate (classify) responses
+        logger.info("Running evaluation...")
+        detailed_df, statistics = self.evaluator.evaluate(
+            prompts=prompts,
+            processed_prompts=processed_texts,
+            responses=response_dict,
+        )
+
+        # Step 5: Add metadata columns to DataFrame
+        detailed_df['target_model'] = self.target_model.model_id
+        detailed_df['processing_strategy'] = strategy_str
+        
+        # Store results for saving
+        self.detailed_df = detailed_df
+        self.statistics = statistics
+        self._strategy_str = strategy_str
+        self.num_prompts = len(prompts)
         
         self._save_results_to_folder()
         self._print_summary()
         
-        return self.results
+        # Return a simplified dict for compatibility
+        return {
+            'task_name': self.name,
+            'experiment_dir': str(self.experiment_dir),
+            'statistics': statistics
+        }
     
     def _save_results_to_folder(self):
-        """Save task results to folder structure."""
-        if not self.results:
+        """Save task results to folder structure: detailed_results.csv and result.json."""
+        if not hasattr(self, 'detailed_df') or self.detailed_df is None:
             return
         
         logger.info(f"Saving results to {self.experiment_dir}")
-        config_file = self.experiment_dir / "config.md"
-        summary_file = self.experiment_dir / "summary.json"
-        detailed_file = self.experiment_dir / "detailed_results.jsonl"
         
-        # 1. Detailed Results
-        with open(detailed_file, 'w', encoding='utf-8') as f:
-            for result in self.results['results']:
-                # Ensure we save all keys, especially baseline data
-                f.write(json.dumps(result) + '\n')
-                
-        # 2. Config & Summary
-        statistics = self.results.get('statistics', {})
+        detailed_csv_file = self.experiment_dir / "detailed_results.csv"
+        result_json_file = self.experiment_dir / "result.json"
         
-        # Basic filtering for valid scores
-        def get_valid_scores(key):
-             return [r[key] for r in self.results['results'] if r.get(key) is not None]
-
-        baseline_scores = get_valid_scores('baseline_obedience_score')
-        jailbreak_scores = get_valid_scores('jailbreak_obedience_score')
-        effectiveness_scores = get_valid_scores('jailbreak_effectiveness')
+        # 1. Save detailed results to CSV
+        self.detailed_df.to_csv(detailed_csv_file, index=False)
+        logger.info(f"  - Saved detailed_results.csv ({len(self.detailed_df)} rows)")
         
-        # self._write_config_markdown(config_file, baseline_scores, jailbreak_scores, effectiveness_scores)
-        
-        summary = {
-            'configuration': {
-                'task_name': self.results['task_name'],
-                'input_path': self.results['input_path'],
-                'experiment_dir': self.results['experiment_dir'],
-                'processing_strategy': self.results['processing_strategy'],
-                'target_model': self.results['target_model'],
-                'processing_model': self.results['processing_model'],
-                'evaluation_model': self.results['evaluation_model'],
-                'mode': self.mode,
-                'evaluation_method': self.evaluation_method
-            },
-            'data': {'num_prompts': self.results['num_prompts']},
-            'statistics': statistics
+        # 2. Build and save result.json (using config for serialization)
+        result_data = {
+            'configuration': self.config.to_dict(),
+            'result': self.statistics
         }
         
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            json.dump(summary, f, indent=2)
-            
+        with open(result_json_file, 'w', encoding='utf-8') as f:
+            json.dump(result_data, f, indent=2)
+        
+        logger.info(f"  - Saved result.json")
         logger.info("✅ Saved task results")
-
-    def _write_config_markdown(self, config_file: Path, baseline_scores: list, jailbreak_scores: list, effectiveness_scores: list):
-        """Write human-readable configuration and results to Markdown file."""
-        import datetime
-        
-        avg_baseline = sum(baseline_scores) / len(baseline_scores) if baseline_scores else 0
-        avg_jailbreak = sum(jailbreak_scores) / len(jailbreak_scores) if jailbreak_scores else 0
-        success_rate = (sum(1 for e in effectiveness_scores if e > 0) / len(effectiveness_scores) * 100) if effectiveness_scores else 0
-        
-        content = f"""# Task Configuration and Results
-**Task Name:** `{self.name}`  
-**Date:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
-**Mode:** `{self.mode}`  
-**Date:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
-**Mode:** `{self.mode}`  
-**Method:** `{self.evaluation_method}`
-**Input Path:** `{self.results['input_path']}`
-
-## Strategy
-`{self.results['processing_strategy']}`
-
-## Results
-- **Baseline Avg:** {avg_baseline:.3f}
-- **Jailbreak Avg:** {avg_jailbreak:.3f}
-- **Success Rate:** {success_rate:.1f}%
-"""
-        with open(config_file, 'w', encoding='utf-8') as f:
-            f.write(content)
 
     def _print_summary(self):
         """Print summary."""
-        stats = self.results.get('statistics', {})
+        stats = getattr(self, 'statistics', {})
         logger.info(f"Task Complete. Stats: {stats}")
 
     def __repr__(self) -> str:
-        return f"Task(name='{self.name}', mode='{self.mode}', method='{self.evaluation_method}')"
+        return f"Task(name='{self.name}', strategy='{self.strategy}')"

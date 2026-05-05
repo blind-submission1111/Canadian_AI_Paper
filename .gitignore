@@ -41,14 +41,19 @@ ENV/
 
 
 # custom
+private_files/
 other_repos/
 src/others' codes/
 dependency_bug_fix/
-nu_rc_cluster_files/
+nurc_cluster_files/
+human_and_ai_agent_interaction/
 my_old_data_and_experiments/
+cluster_files_and_commands/
 experiment_data/
 src/data/original_datasets/
 paper/
+logs/
+backuo/
 final_update_paper.py
 
 # Ignored Temporary Files

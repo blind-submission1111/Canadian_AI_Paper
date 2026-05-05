@@ -5,26 +5,15 @@ This service runs models locally on your hardware and automatically detects:
 - MPS (Apple Silicon M1/M2/M3/M4)
 - CUDA (NVIDIA GPUs)
 - CPU (fallback)
-
-Optimizations:
-- Native GPU batch inference (process multiple prompts in parallel on GPU)
-- Parallel CPU preprocessing (tokenization, prompt formatting)
 """
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Union
 from pathlib import Path
 
-from .base_llm_service import BaseLLMService
-from .llm_model import LLMModel
-from .constants import (
-    HUGGINGFACE_TOKEN,
-    DEFAULT_TEMPERATURE,
-    DEFAULT_MAX_TOKENS,
-    DEFAULT_LOCAL_BATCH_SIZE,
-    DEFAULT_TOP_P,
-)
-from ..utils.logger import get_logger
-from ..utils import multiprocess_run
-from ..utils.constants import PARALLEL_PROCESSING_THRESHOLD
+from ..base_llm_service import BaseLLMService
+from ..llm_model import LLMModel
+from ..llm_config import LLMConfig
+from ..llm_constants import HUGGINGFACE_TOKEN, DEFAULT_LOCAL_BATCH_SIZE
+from ...utils.logger import get_logger
 
 try:
     from tqdm import tqdm
@@ -45,21 +34,23 @@ class LocalLMService(BaseLLMService):
     - CPU as fallback
     """
     
-    def __init__(self, model: LLMModel, **kwargs):
+    def __init__(self, model: LLMModel, config: LLMConfig = None, **kwargs):
         """
         Initialize local LM service.
         
         Args:
             model: The LLM model to use
+            config: LLMConfig with default parameters (optional)
             **kwargs: Additional parameters
-                - temperature (float): Sampling temperature (default: from constants.py)
-                - max_tokens (int): Maximum tokens to generate (default: from constants.py)
+                - temperature (float): Sampling temperature
+                - max_tokens (int): Maximum tokens to generate
                 - device (str): Force specific device ('cuda', 'mps', 'cpu')
                                If not specified, auto-detects best available
         """
         self.model = model
-        self.temperature = kwargs.get('temperature', DEFAULT_TEMPERATURE)
-        self.max_tokens = kwargs.get('max_tokens', DEFAULT_MAX_TOKENS)
+        self.config = config or LLMConfig()
+        self.temperature = kwargs.get('temperature', self.config.temperature)
+        self.max_tokens = kwargs.get('max_tokens', self.config.max_tokens)
         
         # Import required libraries
         try:
@@ -175,33 +166,13 @@ class LocalLMService(BaseLLMService):
             full_prompt = prompt_text
         return (prompt_id, full_prompt)
     
-    def prepare_batch_prompts(
+    def _prepare_prompts(
         self,
         prompts: List[Tuple[str, str]],
         system_message: Optional[str] = None,
     ) -> List[Tuple[str, str]]:
-        """
-        Prepare multiple prompts in parallel for batch GPU inference.
-        Automatically uses parallel processing for larger batches.
-        
-        Args:
-            prompts: List of (id, prompt_text) tuples
-            system_message: Optional system message
-        
-        Returns:
-            List of (id, formatted_prompt) tuples ready for batch inference
-        """
-        # Auto-enable parallel processing based on threshold
-        if len(prompts) < PARALLEL_PROCESSING_THRESHOLD:
-            return [self._prepare_prompt(p, system_message) for p in prompts]
-        
-        # Use parallel processing for CPU-bound preparation
-        return multiprocess_run(
-            self._prepare_prompt,
-            prompts,
-            task_type="cpu",
-            system_message=system_message
-        )
+        """Prepare multiple prompts for batch inference."""
+        return [self._prepare_prompt(p, system_message) for p in prompts]
     
     def batch_generate(
         self,
@@ -210,41 +181,27 @@ class LocalLMService(BaseLLMService):
         **kwargs
     ) -> List[Tuple[str, str]]:
         """
-        Generate text responses for multiple prompts using native GPU batch inference.
-
-        Optimizations:
-        1. Parallel CPU preprocessing (prompt formatting)
-        2. Native GPU batch inference (process all prompts in parallel on GPU)
+        Generate text responses for multiple prompts using GPU batch inference.
 
         Args:
             prompts: List of (id, prompt) tuples
             system_message: Optional system message
-            **kwargs: Additional parameters
-                - temperature: Sampling temperature (default: from instance init or constants.py)
-                - max_tokens: Maximum tokens to generate (default: from instance init or constants.py)
-                - top_p: Nucleus sampling parameter (default: from constants.py, only used when temperature > 0)
-                - batch_size: GPU batch size for inference (default: from constants.py)
+            **kwargs: Additional parameters (temperature, max_tokens, top_p, batch_size)
 
         Returns:
             List of (id, response) tuples. On errors, returns (id, error_message_string).
         """
         temperature = kwargs.get('temperature', self.temperature)
         max_tokens = kwargs.get('max_tokens', self.max_tokens)
-        top_p = kwargs.get('top_p', DEFAULT_TOP_P)
-        batch_size = kwargs.get('batch_size', DEFAULT_LOCAL_BATCH_SIZE)  # GPU batch size
+        top_p = kwargs.get('top_p', self.config.top_p)
+        batch_size = kwargs.get('batch_size', DEFAULT_LOCAL_BATCH_SIZE)
 
-        # Workaround for MPS limitations with large models (7B+)
-        # MPS can hang or be extremely slow with batch_size > 1 on large models
-        # Force sequential processing (batch_size=1) on MPS for better stability
+        # MPS workaround: force batch_size=1 to avoid hanging
         if self.device == "mps" and batch_size > 1:
-            logger.info(
-                f"Detected MPS device with large model. Reducing batch_size from {batch_size} to 1 "
-                "to avoid MPS hanging issues. MPS has known limitations with batched inference on large models."
-            )
+            logger.info(f"MPS device: reducing batch_size to 1 for stability")
             batch_size = 1
 
-        # Step 1: Parallel preprocessing (CPU-bound)
-        prepared = self.prepare_batch_prompts(prompts, system_message)
+        prepared = self._prepare_prompts(prompts, system_message)
         
         # Step 2: Native GPU batch inference with progress bar
         prompt_ids = [pid for pid, _ in prepared]
@@ -359,14 +316,30 @@ class LocalLMService(BaseLLMService):
             return results
     
     @staticmethod
+    def _get_image_name(image: Any) -> str:
+        """Get a descriptive name for an image."""
+        try:
+            from PIL import Image
+            if isinstance(image, Image.Image):
+                return f"PIL_Image_{image.size[0]}x{image.size[1]}"
+        except ImportError:
+            pass
+        
+        if isinstance(image, (str, Path)):
+            return Path(image).name
+        
+        return "unknown_image"
+
+    @staticmethod
     def _prepare_conversation(
-        conversation_data: Tuple[str, List[Tuple[str, Optional[str]]]]
+        conversation_data: Tuple[str, List[Tuple[str, Any]]]
     ) -> Tuple[str, str]:
         """
         Prepare a single conversation (CPU-bound preprocessing).
         
         Args:
-            conversation_data: (id, messages) tuple with (text, image_path) messages
+            conversation_data: (id, messages) tuple with (text, image) messages
+                where image can be: None, file path string, PIL Image, or list of images
         
         Returns:
             (id, formatted_conversation) tuple
@@ -375,11 +348,16 @@ class LocalLMService(BaseLLMService):
         conversation_parts = []
         has_images = False
         
-        for prompt_text, image_path in messages:
-            if image_path is not None:
+        for prompt_text, image in messages:
+            if image is not None:
                 has_images = True
-                # Most local models don't support images
-                conversation_parts.append(f"{prompt_text} [Image: {Path(image_path).name}]")
+                # Normalize to list of images
+                images = image if isinstance(image, list) else [image]
+                image_names = [LocalLMService._get_image_name(img) for img in images if img is not None]
+                if image_names:
+                    conversation_parts.append(f"{prompt_text} [Images: {', '.join(image_names)}]")
+                else:
+                    conversation_parts.append(prompt_text)
             else:
                 conversation_parts.append(prompt_text)
         
@@ -391,74 +369,43 @@ class LocalLMService(BaseLLMService):
         
         return (conv_id, full_prompt)
     
-    def prepare_batch_conversations(
+    def _prepare_conversations(
         self,
-        conversations: List[Tuple[str, List[Tuple[str, Optional[str]]]]],
+        conversations: List[Tuple[str, List[Tuple[str, Any]]]],
     ) -> List[Tuple[str, str]]:
-        """
-        Prepare multiple conversations in parallel for batch GPU inference.
-        Automatically uses parallel processing for larger batches.
-        
-        Args:
-            conversations: List of (id, messages) tuples
-        
-        Returns:
-            List of (id, formatted_conversation) tuples ready for batch inference
-        """
-        # Auto-enable parallel processing based on threshold
-        if len(conversations) < PARALLEL_PROCESSING_THRESHOLD:
-            return [self._prepare_conversation(c) for c in conversations]
-        
-        # Use parallel processing for CPU-bound preparation
-        return multiprocess_run(
-            self._prepare_conversation,
-            conversations,
-            task_type="cpu"
-        )
+        """Prepare multiple conversations for batch inference."""
+        return [self._prepare_conversation(c) for c in conversations]
     
     def batch_chat(
         self,
-        conversations: List[Tuple[str, List[Tuple[str, Optional[str]]]]],
+        conversations: List[Tuple[str, List[Tuple[str, Any]]]],
         **kwargs
     ) -> List[Tuple[str, str]]:
         """
-        Generate responses for multiple chat conversations using native GPU batch inference.
+        Generate responses for multiple chat conversations using GPU batch inference.
 
-        Optimizations:
-        1. Parallel CPU preprocessing (conversation formatting)
-        2. Native GPU batch inference (process all conversations in parallel on GPU)
-
-        Note: Most local models don't support images natively.
-        If image_path is provided, it will be ignored with a warning.
+        Note: Most local models don't support images natively. Images are converted
+        to text placeholders.
 
         Args:
-            conversations: List of (id, messages) tuples
-            **kwargs: Additional parameters
-                - temperature: Sampling temperature (default: from instance init or constants.py)
-                - max_tokens: Maximum tokens to generate (default: from instance init or constants.py)
-                - top_p: Nucleus sampling parameter (default: from constants.py, only used when temperature > 0)
-                - batch_size: GPU batch size for inference (default: from constants.py)
+            conversations: List of (id, messages) tuples, where messages is
+                a list of (prompt, image) tuples. Image can be file path, PIL Image, or list.
+            **kwargs: Additional parameters (temperature, max_tokens, top_p, batch_size)
 
         Returns:
             List of (id, response) tuples. On errors, returns (id, error_message_string).
         """
         temperature = kwargs.get('temperature', self.temperature)
         max_tokens = kwargs.get('max_tokens', self.max_tokens)
-        top_p = kwargs.get('top_p', DEFAULT_TOP_P)
-        batch_size = kwargs.get('batch_size', DEFAULT_LOCAL_BATCH_SIZE)  # GPU batch size
+        top_p = kwargs.get('top_p', self.config.top_p)
+        batch_size = kwargs.get('batch_size', DEFAULT_LOCAL_BATCH_SIZE)
 
-        # Workaround for MPS limitations with large models (7B+)
-        # MPS can hang or be extremely slow with batch_size > 1 on large models
-        # Force sequential processing (batch_size=1) on MPS for better stability
+        # MPS workaround: force batch_size=1 to avoid hanging
         if self.device == "mps" and batch_size > 1:
-            logger.info(
-                f"Detected MPS device with large model. Reducing batch_size from {batch_size} to 1 "
-                "to avoid MPS hanging issues. MPS has known limitations with batched inference on large models."
-            )
+            logger.info(f"MPS device: reducing batch_size to 1 for stability")
             batch_size = 1
 
-        # Step 1: Parallel preprocessing (CPU-bound)
-        prepared = self.prepare_batch_conversations(conversations)
+        prepared = self._prepare_conversations(conversations)
         
         # Step 2: Native GPU batch inference with progress bar
         conv_ids = [cid for cid, _ in prepared]
@@ -569,4 +516,3 @@ class LocalLMService(BaseLLMService):
                     results.append((conv_id, f"Error: {str(e2)}"))
             
             return results
-

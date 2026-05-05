@@ -1,0 +1,101 @@
+{
+  "num_api_workers": 8,
+  "tasks": [
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "non_llm_baseline"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "llm_set_theory"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "llm_formal_logic"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "harmbench_standard"
+      },
+      "processor": {
+        "strategy": "llm_quantum_mechanics"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "non_llm_baseline"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "llm_set_theory"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "llm_formal_logic"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    },
+    {
+      "target_model": "gpt-5",
+      "dataloader": {
+        "dataset_name": "jailbreakbench"
+      },
+      "processor": {
+        "strategy": "llm_quantum_mechanics"
+      },
+      "evaluation": {
+        "method": "harmbench"
+      }
+    }
+  ]
+}

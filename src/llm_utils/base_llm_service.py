@@ -3,7 +3,7 @@ Base abstract class for LLM services.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional
 
 
 class BaseLLMService(ABC):
@@ -32,7 +32,7 @@ class BaseLLMService(ABC):
     @abstractmethod
     def batch_chat(
         self,
-        conversations: List[Tuple[str, List[Tuple[str, Optional[str]]]]],
+        conversations: List[Tuple[str, List[Tuple[str, Optional[Any]]]]],
         **kwargs
     ) -> List[Tuple[str, str]]:
         """
@@ -40,8 +40,11 @@ class BaseLLMService(ABC):
         
         Args:
             conversations: List of (id, messages) tuples, where id is a unique identifier
-                and messages is a list of (prompt, image_path) tuples. image_path can be None
-                for text-only messages.
+                and messages is a list of (text, images) tuples. images can be:
+                - None for text-only messages
+                - PIL.Image object
+                - List of PIL.Image objects
+                - URL string
             **kwargs: Additional model-specific parameters
         
         Returns:

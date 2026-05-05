@@ -15,6 +15,9 @@ from .processors.non_llm_addition_equation_split_reassemble_processor import Add
 from .processors.non_llm_conditional_probability_processor import ConditionalProbabilityProcessor
 from .processors.non_llm_symbol_injection_processor import SymbolInjectionProcessor
 from .processors.llm_quantum_mechanics_processor import QuantumMechanicsLLMProcessor
+from .processors.llm_formal_logic_processor import FormalLogicLLMProcessor
+from .processors.non_llm_baseline_processor import BaselineProcessor
+from .processors.non_llm_repeat_processor import RepeatProcessor
 
 logger = get_logger(__name__)
 
@@ -33,6 +36,9 @@ PROCESSORS: Dict[str, type] = {
     ProcessorType.NON_LLM_CONDITIONAL_PROBABILITY: ConditionalProbabilityProcessor,
     ProcessorType.NON_LLM_SYMBOL_INJECTION: SymbolInjectionProcessor,
     ProcessorType.LLM_QUANTUM_MECHANICS: QuantumMechanicsLLMProcessor,
+    ProcessorType.LLM_FORMAL_LOGIC: FormalLogicLLMProcessor,
+    ProcessorType.NON_LLM_BASELINE: BaselineProcessor,
+    ProcessorType.NON_LLM_REPEAT: RepeatProcessor,
 }
 
 

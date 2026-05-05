@@ -1,17 +1,13 @@
 """
 Google Gemini service implementation.
 """
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any
 import google.genai as genai
-from .base_llm_service import BaseLLMService
-from .llm_model import LLMModel
-from .constants import (
-    GOOGLE_API_KEY,
-    DEFAULT_TEMPERATURE,
-    DEFAULT_MAX_TOKENS,
-    DEFAULT_TOP_P,
-)
-from ..utils.logger import get_logger
+from ..base_llm_service import BaseLLMService
+from ..llm_model import LLMModel
+from ..llm_config import LLMConfig
+from ..llm_constants import GOOGLE_API_KEY
+from ...utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -19,24 +15,26 @@ logger = get_logger(__name__)
 class GoogleService(BaseLLMService):
     """Service for Google Gemini models."""
 
-    def __init__(self, model: LLMModel, **kwargs):
+    def __init__(self, model: LLMModel, config: LLMConfig = None, **kwargs):
         """
         Initialize Google Gemini service.
 
         Args:
             model: The LLM model to use
+            config: LLMConfig with default parameters (optional)
             **kwargs: Additional parameters
                 - api_key (str): Google API key (optional, will load from env)
-                - temperature (float): Sampling temperature (default: from constants.py)
-                - max_tokens (int): Maximum tokens to generate (default: from constants.py)
+                - temperature (float): Sampling temperature
+                - max_tokens (int): Maximum tokens to generate
         """
         self.model = model
+        self.config = config or LLMConfig()
         self.api_key = kwargs.get('api_key') or GOOGLE_API_KEY
         if not self.api_key:
             logger.error("Google API key not found")
             raise ValueError("Google API key not found. Set GOOGLE_API_KEY in .env or pass api_key parameter")
-        self.temperature = kwargs.get('temperature', DEFAULT_TEMPERATURE)
-        self.max_tokens = kwargs.get('max_tokens', DEFAULT_MAX_TOKENS)
+        self.temperature = kwargs.get('temperature', self.config.temperature)
+        self.max_tokens = kwargs.get('max_tokens', self.config.max_tokens)
 
         # Initialize Google Generative AI client (new SDK)
         try:
@@ -60,16 +58,16 @@ class GoogleService(BaseLLMService):
             prompts: List of (id, prompt) tuples
             system_message: Optional system message (will be prepended to each prompt)
             **kwargs: Additional parameters
-                - temperature: Sampling temperature (default: from instance init or constants.py)
-                - max_tokens: Maximum tokens to generate (default: from instance init or constants.py)
-                - top_p: Nucleus sampling parameter (default: from constants.py, only used when temperature > 0)
+                - temperature: Sampling temperature
+                - max_tokens: Maximum tokens to generate
+                - top_p: Nucleus sampling parameter (only used when temperature > 0)
 
         Returns:
             List of (id, response) tuples. On errors, returns (id, error_message_string).
         """
         temperature = kwargs.get('temperature', self.temperature)
         max_tokens = kwargs.get('max_tokens', self.max_tokens)
-        top_p = kwargs.get('top_p', DEFAULT_TOP_P)
+        top_p = kwargs.get('top_p', self.config.top_p)
 
         results = []
         total = len(prompts)
@@ -162,7 +160,7 @@ class GoogleService(BaseLLMService):
     
     def batch_chat(
         self,
-        conversations: List[Tuple[str, List[Tuple[str, Optional[str]]]]],
+        conversations: List[Tuple[str, List[Tuple[str, Any]]]],
         **kwargs
     ) -> List[Tuple[str, str]]:
         """
@@ -170,42 +168,55 @@ class GoogleService(BaseLLMService):
 
         Args:
             conversations: List of (id, messages) tuples, where messages is
-                a list of (prompt, image_path) tuples
+                a list of (prompt, image) tuples. Image can be file path, PIL Image, or list.
             **kwargs: Additional parameters
-                - temperature: Sampling temperature (default: from instance init or constants.py)
-                - max_tokens: Maximum tokens to generate (default: from instance init or constants.py)
-                - top_p: Nucleus sampling parameter (default: from constants.py, only used when temperature > 0)
+                - temperature: Sampling temperature
+                - max_tokens: Maximum tokens to generate
+                - top_p: Nucleus sampling parameter (only used when temperature > 0)
 
         Returns:
             List of (id, response) tuples. On errors, returns (id, error_message_string).
         """
         temperature = kwargs.get('temperature', self.temperature)
         max_tokens = kwargs.get('max_tokens', self.max_tokens)
-        top_p = kwargs.get('top_p', DEFAULT_TOP_P)
+        top_p = kwargs.get('top_p', self.config.top_p)
 
         results = []
         total = len(conversations)
+        log_interval = max(1, total // 10)  # Log every 10% or at least every request
 
         for idx, (conv_id, messages) in enumerate(conversations, 1):
             try:
+                if idx == 1 or idx % log_interval == 0 or idx == total:
+                    logger.info(f"Processing request {idx}/{total} ({idx*100//total}%)")
                 logger.debug(f"Processing conversation {idx}/{total} (ID: {conv_id})")
 
                 # Build conversation history
                 conversation_parts = []
-                for prompt_text, image_path in messages:
-                    if image_path is None:
+                for prompt_text, image in messages:
+                    if image is None:
                         # Text-only message
                         conversation_parts.append(prompt_text)
                     else:
-                        # Multimodal message with image
+                        # Multimodal message with image(s)
                         try:
                             import PIL.Image
-                            img = PIL.Image.open(image_path)
-                            conversation_parts.append(img)
+                            # Normalize to list of images
+                            images = image if isinstance(image, list) else [image]
+                            
+                            for img in images:
+                                if img is None:
+                                    continue
+                                # Handle both PIL Image and file path
+                                if isinstance(img, PIL.Image.Image):
+                                    conversation_parts.append(img)
+                                else:
+                                    # File path - open it
+                                    conversation_parts.append(PIL.Image.open(str(img)))
                             conversation_parts.append(prompt_text)
                         except Exception as e:
                             # If image loading fails, send text only
-                            logger.warning(f"Image load error for {image_path}: {str(e)}")
+                            logger.warning(f"Image load error: {str(e)}")
                             conversation_parts.append(f"{prompt_text} [Image load error: {str(e)}]")
 
                 # Configure generation parameters (new SDK)
@@ -268,4 +279,3 @@ class GoogleService(BaseLLMService):
                 results.append((conv_id, f"Error: {error_msg}"))
         
         return results
-

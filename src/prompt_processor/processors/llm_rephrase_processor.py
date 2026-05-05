@@ -174,7 +174,7 @@ Remember: You are rephrasing to make the query sound more formal and indirect, N
         
         return "Error: No response generated"
     
-    def batch_process(self, prompts: List[str], **kwargs) -> List[str]:
+    def _batch_process_core(self, prompts: List[str], **kwargs) -> List[str]:
         """
         Rephrase multiple prompts efficiently by sending batch request to LLM API.
         

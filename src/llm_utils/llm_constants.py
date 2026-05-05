@@ -27,23 +27,6 @@ OLLAMA_VERSION_URL: Final[str] = f"{OLLAMA_BASE_URL}/api/version"
 OLLAMA_CHAT_URL: Final[str] = f"{OLLAMA_BASE_URL}/api/chat"
 OLLAMA_GENERATE_URL: Final[str] = f"{OLLAMA_BASE_URL}/api/generate"
 
-# =============================================================================
-# Default parameters for LLM requests (optimized for jailbreaking research)
-# =============================================================================
-# These defaults are used across ALL LLM services unless explicitly overridden
-
-DEFAULT_MAX_TOKENS: Final[int] = 1024 * 4  # Longer responses for detailed harmful content
-DEFAULT_TEMPERATURE: Final[float] = 0.0  # Deterministic output for reproducibility
-DEFAULT_TOP_P: Final[float] = 1.0  # Not used when temperature=0
-DEFAULT_TOP_K: Final[int] = 1  # Not used when temperature=0 (mainly for local models)
-DEFAULT_FREQUENCY_PENALTY: Final[float] = 0.0  # No penalty (want full harmful content)
-DEFAULT_PRESENCE_PENALTY: Final[float] = 0.0  # No penalty (want full harmful content)
-DEFAULT_STOP_SEQUENCES: Final[list[str]] = []  # Let model complete full response
-DEFAULT_SEED: Final[int | None] = 42  # Fixed seed for reproducible experiments
-DEFAULT_N_COMPLETIONS: Final[int] = 1  # Single completion per prompt
-DEFAULT_STREAM: Final[bool] = False  # No streaming for batch evaluation
-
-# Default system message for prompts
 DEFAULT_SYSTEM_MESSAGE: Final[str] = "You are a helpful assistant."
 
 
@@ -96,11 +79,12 @@ MODELS_USING_MAX_COMPLETION_TOKENS: Final[set[LLMModel]] = {
 # They only accept the default (temperature=1.0) and will error if you try to set it
 
 MODELS_WITHOUT_TEMPERATURE_SUPPORT: Final[set[LLMModel]] = {
-    # GPT-5 series (nano variant)
+    # GPT-5 series
+    LLMModel.GPT_5,
+    LLMModel.GPT_5_MINI,
     LLMModel.GPT_5_NANO,
     
     # Note: Add other models here if they don't support custom temperature
-    # GPT-5 and GPT-5-Mini may support temperature, but GPT-5-Nano doesn't
 }
 
 
@@ -110,7 +94,7 @@ MODELS_WITHOUT_TEMPERATURE_SUPPORT: Final[set[LLMModel]] = {
 
 # API batch processing (OpenAI, Claude)
 # Note: Currently for documentation purposes. Use when implementing async batch API calls.
-DEFAULT_API_BATCH_SIZE: Final[int] = 300  # Max API requests in parallel
+DEFAULT_API_BATCH_SIZE: Final[int] = 300  # Max API requests in a batch
 
 # Local model GPU batch inference (HuggingFace Transformers)
 # Adjust based on your model size and GPU:
@@ -120,3 +104,11 @@ DEFAULT_API_BATCH_SIZE: Final[int] = 300  # Max API requests in parallel
 # - High-end GPUs (A100, H100): 32-64
 # Note: 1B models work well with batch_size=4, larger models may need batch_size=1
 DEFAULT_LOCAL_BATCH_SIZE: Final[int] = 4  # Good for 1B models on MPS
+
+
+# =============================================================================
+# Vision-Language Model Support
+# =============================================================================
+# vLLM's llm.chat() handles images automatically via structured messages.
+# No model-specific placeholders needed - just pass PIL.Image in the content:
+#   {"type": "image_url", "image_url": {"url": pil_image}}

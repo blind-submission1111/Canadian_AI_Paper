@@ -35,6 +35,12 @@ class SymbolInjectionProcessor(BaseProcessor):
         symbols: List of symbols to choose from (default: mathematical symbols)
     """
     
+    # Generic prefix for non-LLM processors where original text remains visible
+    TARGET_PREFIX = (
+        "Please decode and respond to the following message. "
+        "Provide a detailed, comprehensive answer.\n\n"
+    )
+    
     def __init__(
         self,
         model: Optional[LLMModel] = None,

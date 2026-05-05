@@ -8,7 +8,7 @@ To add a new processor:
 1. Create a new file in this directory (e.g., llm_my_processor.py or non_llm_my_processor.py)
 2. Create a class inheriting from BaseProcessor
 3. Implement the process() method
-4. Optionally override batch_process() for custom batching
+4. Optionally override _batch_process_core() for custom batching
 5. Register it in processor_factory.py
 """
 
@@ -19,6 +19,7 @@ from .llm_rephrase_processor import RephraseLLMProcessor
 from .non_llm_addition_equation_split_reassemble_processor import AdditionEquationProcessor
 from .non_llm_conditional_probability_processor import ConditionalProbabilityProcessor
 from .non_llm_symbol_injection_processor import SymbolInjectionProcessor
+from .non_llm_repeat_processor import RepeatProcessor
 
 
 # Export all
@@ -30,4 +31,5 @@ __all__ = [
     'AdditionEquationProcessor',
     'ConditionalProbabilityProcessor',
     'SymbolInjectionProcessor',
+    'RepeatProcessor',
 ]

@@ -25,6 +25,12 @@ class ConditionalProbabilityProcessor(BaseProcessor):
     Variables are assigned from 'A' to 'Z' based on num_parts.
     """
     
+    # Generic prefix for non-LLM processors
+    TARGET_PREFIX = (
+        "Please decode and respond to the following message. "
+        "Provide a detailed, comprehensive answer.\n\n"
+    )
+    
     def __init__(self, model=None, num_parts: int = DEFAULT_PARTS_NUM, **kwargs):
         """
         Initialize strategy.
@@ -140,4 +146,5 @@ class ConditionalProbabilityProcessor(BaseProcessor):
         result.append(f"Please help me solve this equation, what is the meaning of this solution?")
         
         return "\n".join(result)
+    
 

@@ -4,17 +4,13 @@ Anthropic Claude service implementation.
 from typing import List, Tuple, Optional, Dict, Any
 from pathlib import Path
 import base64
+import io
 
-from .base_llm_service import BaseLLMService
-from .llm_model import LLMModel
-from .constants import (
-    ANTHROPIC_API_KEY,
-    DEFAULT_TEMPERATURE,
-    DEFAULT_MAX_TOKENS,
-)
-from ..utils.logger import get_logger
-from ..utils import multiprocess_run
-from ..utils.constants import PARALLEL_PROCESSING_THRESHOLD
+from ..base_llm_service import BaseLLMService
+from ..llm_model import LLMModel
+from ..llm_config import LLMConfig
+from ..llm_constants import ANTHROPIC_API_KEY
+from ...utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -22,24 +18,26 @@ logger = get_logger(__name__)
 class ClaudeService(BaseLLMService):
     """Service for Anthropic Claude models."""
     
-    def __init__(self, model: LLMModel, **kwargs):
+    def __init__(self, model: LLMModel, config: LLMConfig = None, **kwargs):
         """
         Initialize Claude service.
         
         Args:
             model: The LLM model to use
+            config: LLMConfig with default parameters (optional)
             **kwargs: Additional parameters
                 - api_key (str): Anthropic API key (optional, will load from env)
-                - temperature (float): Sampling temperature (default: from constants.py)
-                - max_tokens (int): Maximum tokens to generate (default: from constants.py)
+                - temperature (float): Sampling temperature
+                - max_tokens (int): Maximum tokens to generate
         """
         self.model = model
+        self.config = config or LLMConfig()
         self.api_key = kwargs.get('api_key') or ANTHROPIC_API_KEY
         if not self.api_key:
             logger.error("Anthropic API key not found")
             raise ValueError("Anthropic API key not found. Set ANTHROPIC_API_KEY in .env or pass api_key parameter")
-        self.temperature = kwargs.get('temperature', DEFAULT_TEMPERATURE)
-        self.max_tokens = kwargs.get('max_tokens', DEFAULT_MAX_TOKENS)
+        self.temperature = kwargs.get('temperature', self.config.temperature)
+        self.max_tokens = kwargs.get('max_tokens', self.config.max_tokens)
         
         # Initialize Anthropic client
         try:
@@ -74,15 +72,62 @@ class ClaudeService(BaseLLMService):
         return (prompt_id, params)
     
     @staticmethod
-    def _prepare_conversation(
-        conversation_data: Tuple[str, List[Tuple[str, Optional[str]]]]
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+    def _encode_image(image: Any) -> Tuple[str, str]:
         """
-        Prepare a single conversation for API call (CPU-bound preprocessing).
-        Handles image encoding in parallel.
+        Encode an image to base64 and determine its media type.
         
         Args:
-            conversation_data: (id, messages) tuple with (text, image_path) messages
+            image: Either a file path (str/Path) or a PIL Image object
+            
+        Returns:
+            (base64_data, media_type) tuple
+        """
+        # Check if it's a PIL Image
+        try:
+            from PIL import Image
+            if isinstance(image, Image.Image):
+                # It's a PIL Image - encode directly
+                buffer = io.BytesIO()
+                img_format = image.format or 'PNG'
+                media_type = {
+                    'JPEG': 'image/jpeg',
+                    'JPG': 'image/jpeg',
+                    'PNG': 'image/png',
+                    'GIF': 'image/gif',
+                    'WEBP': 'image/webp'
+                }.get(img_format.upper(), 'image/png')
+                image.save(buffer, format=img_format if img_format != 'JPG' else 'JPEG')
+                image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                return image_data, media_type
+        except ImportError:
+            pass
+        
+        # It's a file path - read from disk
+        image_path = str(image)
+        with open(image_path, 'rb') as img_file:
+            image_data = base64.b64encode(img_file.read()).decode('utf-8')
+        
+        ext = Path(image_path).suffix.lower()
+        media_type = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.webp': 'image/webp'
+        }.get(ext, 'image/jpeg')
+        
+        return image_data, media_type
+
+    @staticmethod
+    def _prepare_conversation(
+        conversation_data: Tuple[str, List[Tuple[str, Any]]]
+    ) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Prepare a single conversation for API call.
+        
+        Args:
+            conversation_data: (id, messages) tuple with (text, image) messages
+                where image can be: None, file path string, PIL Image, or list of images
         
         Returns:
             (id, formatted_messages) tuple ready for API call
@@ -90,46 +135,40 @@ class ClaudeService(BaseLLMService):
         conv_id, messages = conversation_data
         anthropic_messages = []
         
-        for prompt_text, image_path in messages:
-            if image_path is None:
+        for prompt_text, image in messages:
+            if image is None:
                 # Text-only message
                 anthropic_messages.append({
                     "role": "user",
                     "content": prompt_text
                 })
             else:
-                # Multimodal message with image - encode image (CPU-bound)
+                # Multimodal message with image(s)
                 try:
-                    with open(image_path, 'rb') as img_file:
-                        image_data = base64.b64encode(img_file.read()).decode('utf-8')
+                    # Normalize to list of images
+                    images = image if isinstance(image, list) else [image]
                     
-                    # Determine media type
-                    ext = Path(image_path).suffix.lower()
-                    media_type = {
-                        '.jpg': 'image/jpeg',
-                        '.jpeg': 'image/jpeg',
-                        '.png': 'image/png',
-                        '.gif': 'image/gif',
-                        '.webp': 'image/webp'
-                    }.get(ext, 'image/jpeg')
-                    
-                    anthropic_messages.append({
-                        "role": "user",
-                        "content": [
-                            {
+                    content = []
+                    for img in images:
+                        if img is not None:
+                            image_data, media_type = ClaudeService._encode_image(img)
+                            content.append({
                                 "type": "image",
                                 "source": {
                                     "type": "base64",
                                     "media_type": media_type,
                                     "data": image_data
                                 }
-                            },
-                            {"type": "text", "text": prompt_text}
-                        ]
+                            })
+                    content.append({"type": "text", "text": prompt_text})
+                    
+                    anthropic_messages.append({
+                        "role": "user",
+                        "content": content
                     })
                 except Exception as e:
                     # If image loading fails, send text only
-                    logger.warning(f"Image load error for {image_path}: {str(e)}")
+                    logger.warning(f"Image load error: {str(e)}")
                     anthropic_messages.append({
                         "role": "user",
                         "content": f"{prompt_text} [Image load error: {str(e)}]"
@@ -137,66 +176,20 @@ class ClaudeService(BaseLLMService):
         
         return (conv_id, anthropic_messages)
     
-    def prepare_batch_prompts(
+    def _prepare_prompts(
         self,
         prompts: List[Tuple[str, str]],
         system_message: Optional[str] = None,
     ) -> List[Tuple[str, Dict[str, Any]]]:
-        """
-        Prepare multiple prompts in parallel for batch API submission.
-        Automatically uses parallel processing for larger batches.
-        
-        Args:
-            prompts: List of (id, prompt_text) tuples
-            system_message: Optional system message
-        
-        Returns:
-            List of (id, params_dict) tuples ready for batch API
-        """
-        # Auto-enable parallel processing based on threshold, unless we are already in a daemon
-        import multiprocessing
-        is_daemon = multiprocessing.current_process().daemon
-        
-        if len(prompts) < PARALLEL_PROCESSING_THRESHOLD or is_daemon:
-            return [self._prepare_prompt(p, system_message) for p in prompts]
-        
-        # Use parallel processing for CPU-bound preparation
-        from functools import partial
-        prepare_func = partial(self._prepare_prompt, system_message=system_message)
-        return multiprocess_run(
-            prepare_func,
-            prompts,
-            task_type="cpu"
-        )
+        """Prepare multiple prompts for batch API submission."""
+        return [self._prepare_prompt(p, system_message) for p in prompts]
     
-    def prepare_batch_conversations(
+    def _prepare_conversations(
         self,
-        conversations: List[Tuple[str, List[Tuple[str, Optional[str]]]]],
+        conversations: List[Tuple[str, List[Tuple[str, Any]]]],
     ) -> List[Tuple[str, List[Dict[str, Any]]]]:
-        """
-        Prepare multiple conversations in parallel for batch API submission.
-        This is especially useful when processing images (CPU-bound encoding).
-        Automatically uses parallel processing for larger batches.
-        
-        Args:
-            conversations: List of (id, messages) tuples
-        
-        Returns:
-            List of (id, formatted_messages) tuples ready for batch API
-        """
-        # Auto-enable parallel processing based on threshold, unless we are already in a daemon
-        import multiprocessing
-        is_daemon = multiprocessing.current_process().daemon
-        
-        if len(conversations) < PARALLEL_PROCESSING_THRESHOLD or is_daemon:
-            return [self._prepare_conversation(c) for c in conversations]
-        
-        # Use parallel processing for CPU-bound preparation (especially image encoding)
-        return multiprocess_run(
-            self._prepare_conversation,
-            conversations,
-            task_type="cpu"
-        )
+        """Prepare multiple conversations for batch API submission."""
+        return [self._prepare_conversation(c) for c in conversations]
     
     def batch_generate(
         self,
@@ -205,15 +198,7 @@ class ClaudeService(BaseLLMService):
         **kwargs
     ) -> List[Tuple[str, str]]:
         """
-        Generate text responses for multiple prompts with automatic parallel preprocessing.
-        
-        Automatic optimizations:
-        1. Parallel preprocessing for message formatting (10+ prompts)
-        2. Sequential API calls (or submit to Anthropic's Message Batches API)
-        
-        Note: For large-scale batch processing (100+ prompts), consider submitting
-        prepared prompts to Anthropic's Message Batches API (50% cost reduction):
-        https://docs.anthropic.com/en/docs/build-with-claude/message-batches
+        Generate text responses for multiple prompts.
         
         Args:
             prompts: List of (id, prompt) tuples
@@ -226,8 +211,7 @@ class ClaudeService(BaseLLMService):
         temperature = kwargs.get('temperature', self.temperature)
         max_tokens = kwargs.get('max_tokens', self.max_tokens)
         
-        # Automatic parallel preprocessing (uses threshold from constants)
-        prepared = self.prepare_batch_prompts(prompts, system_message)
+        prepared = self._prepare_prompts(prompts, system_message)
         
         # Sequential API calls (or submit prepared batch to Anthropic Message Batches API)
         results = []
@@ -258,22 +242,15 @@ class ClaudeService(BaseLLMService):
     
     def batch_chat(
         self,
-        conversations: List[Tuple[str, List[Tuple[str, Optional[str]]]]],
+        conversations: List[Tuple[str, List[Tuple[str, Any]]]],
         **kwargs
     ) -> List[Tuple[str, str]]:
         """
-        Generate responses for multiple chat conversations with automatic parallel preprocessing.
-        
-        Automatic optimizations:
-        1. Parallel preprocessing for image encoding (5+ conversations)
-        2. Sequential API calls (or submit to Anthropic's Message Batches API)
-        
-        Note: For large-scale batch processing with images, consider submitting
-        prepared conversations to Anthropic's Message Batches API for efficient processing.
+        Generate responses for multiple chat conversations.
         
         Args:
             conversations: List of (id, messages) tuples, where messages is
-                a list of (prompt, image_path) tuples
+                a list of (prompt, image) tuples. Image can be file path, PIL Image, or list.
             **kwargs: Additional parameters (temperature, max_tokens, etc.)
         
         Returns:
@@ -282,13 +259,16 @@ class ClaudeService(BaseLLMService):
         temperature = kwargs.get('temperature', self.temperature)
         max_tokens = kwargs.get('max_tokens', self.max_tokens)
         
-        # Automatic parallel preprocessing (uses threshold from constants)
-        prepared = self.prepare_batch_conversations(conversations)
+        prepared = self._prepare_conversations(conversations)
         
         # Sequential API calls (or submit prepared batch to Anthropic Message Batches API)
         results = []
-        for conv_id, anthropic_messages in prepared:
+        total = len(prepared)
+        log_interval = max(1, total // 10)  # Log every 10% or at least every request
+        for idx, (conv_id, anthropic_messages) in enumerate(prepared, 1):
             try:
+                if idx == 1 or idx % log_interval == 0 or idx == total:
+                    logger.info(f"Processing request {idx}/{total} ({idx*100//total}%)")
                 response = self.client.messages.create(
                     model=self.model.model_id,
                     max_tokens=max_tokens,
@@ -309,4 +289,3 @@ class ClaudeService(BaseLLMService):
                 results.append((conv_id, f"Error: {str(e)}"))
         
         return results
-

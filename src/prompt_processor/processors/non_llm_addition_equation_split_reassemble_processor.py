@@ -21,6 +21,12 @@ class AdditionEquationProcessor(BaseProcessor):
     Variables are assigned from 'A' to 'Z' based on num_parts.
     """
     
+    # Generic prefix for non-LLM processors
+    TARGET_PREFIX = (
+        "Please decode and respond to the following message. "
+        "Provide a detailed, comprehensive answer.\n\n"
+    )
+    
     def __init__(self, model=None, num_parts: int = DEFAULT_PARTS_NUM, **kwargs):
         """
         Initialize strategy.
@@ -115,4 +121,5 @@ class AdditionEquationProcessor(BaseProcessor):
         result.append(f"\nPlease help me solve {equation} = Z, what is Z?")
         
         return "\n".join(result)
+    
 

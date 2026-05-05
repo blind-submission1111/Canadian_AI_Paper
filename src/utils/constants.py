@@ -44,9 +44,13 @@ MULTIPROCESS_START_METHOD = os.getenv('MULTIPROCESS_START_METHOD', 'spawn')
 # Logging Configuration
 # ============================================================================
 
+# Default logger name
+DEFAULT_LOGGER_NAME = "jailbreak_experiment"
+
 # Whether to show progress for multiprocessing operations
 SHOW_MULTIPROCESS_PROGRESS = False  # Disabled to reduce log clutter
 
 # Log level for multiprocessing operations
 MULTIPROCESS_LOG_LEVEL = "INFO"
+
 

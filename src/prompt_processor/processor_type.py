@@ -44,6 +44,15 @@ class ProcessorType(str, Enum):
     NON_LLM_SYMBOL_INJECTION = "non_llm_symbol_injection"
     """Inject mathematical and special symbols randomly and evenly into the prompt."""
 
+    NON_LLM_BASELINE = "non_llm_baseline"
+    """Passthrough processor that returns input unchanged (replaces old baseline mode)."""
+
     LLM_QUANTUM_MECHANICS = "llm_quantum_mechanics"
     """LLM-based Quantum Mechanics transformation."""
+
+    LLM_FORMAL_LOGIC = "llm_formal_logic"
+    """LLM-based Formal Logic transformation (first-order logic and proof theory)."""
+
+    NON_LLM_REPEAT = "non_llm_repeat"
+    """Replay exact processed prompts from a previous experiment (controlled repeat)."""
 

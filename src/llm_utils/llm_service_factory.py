@@ -1,16 +1,13 @@
 """
 Factory for creating LLM service instances.
 """
-from typing import Dict, Type
+from typing import Dict, Optional, Type
 
 from .llm_model import LLMModel, Provider
 from .base_llm_service import BaseLLMService
 
 # Import concrete service implementations
-from .openai_service import OpenAIService
-from .claude_service import ClaudeService
-from .google_service import GoogleService
-from .local_lm_service import LocalLMService
+from .llm_services import OpenAIService, ClaudeService, GoogleService, LocalLMService, NURCClusterService
 
 
 class LLMServiceFactory:
@@ -21,9 +18,26 @@ class LLMServiceFactory:
         Provider.OPENAI: OpenAIService,
         Provider.ANTHROPIC: ClaudeService,
         Provider.GOOGLE: GoogleService,
-        Provider.TRANSFORMERS: LocalLMService
+        Provider.LOCAL: LocalLMService,
+        Provider.NU_CLUSTER: NURCClusterService,
     }
     
+    # Cluster server manager (set by Experiment before running tasks)
+    _server_manager: Optional[object] = None
+    
+    
+    @classmethod
+    def set_server_manager(cls, manager) -> None:
+        """
+        Register the ClusterModelServerManager.
+        
+        Called by Experiment.run_experiment() after starting servers,
+        so factory can auto-fetch endpoint URLs for cluster models.
+        
+        Args:
+            manager: ClusterModelServerManager instance with running servers.
+        """
+        cls._server_manager = manager
     
     @classmethod
     def get_registered_providers(cls) -> list[Provider]:
@@ -66,6 +80,9 @@ class LLMServiceFactory:
         """
         Create an LLM service instance for the given model.
         
+        For cluster models, automatically fetches the server endpoint
+        from the registered server manager.
+        
         Args:
             model: The LLM model to create a service for
             **kwargs: Additional arguments passed to the service constructor
@@ -73,22 +90,13 @@ class LLMServiceFactory:
                 - temperature (float): Sampling temperature
                 - max_tokens (int): Maximum tokens to generate
                 - api_key (str): API key for API-based services
+                - server_url (str): For cluster models, explicit endpoint URL
         
         Returns:
             Instance of the appropriate service implementation
         
         Raises:
             ValueError: If no service is registered for the model's provider
-        
-        Example:
-            service = LLMServiceFactory.create(
-                LLMModel.GPT_4,
-                temperature=0.7,
-                max_tokens=1000
-            )
-            
-            prompts = [("id1", "What is AI?")]
-            results = service.batch_generate(prompts)
         """
         service_class = cls._PROVIDER_REGISTRY.get(model.provider)
         
@@ -97,5 +105,20 @@ class LLMServiceFactory:
                 f"No service registered for provider: {model.provider}. "
                 f"Available providers: {list(cls._PROVIDER_REGISTRY.keys())}"
             )
+        
+        # For cluster models: inject server_url from manager if not explicitly provided
+        if model.provider == Provider.NU_CLUSTER and "server_url" not in kwargs:
+            if cls._server_manager is None:
+                raise RuntimeError(
+                    f"Cannot create service for cluster model {model.model_id}: "
+                    f"No ClusterModelServerManager registered. "
+                    f"Call LLMServiceFactory.set_server_manager() first."
+                )
+            kwargs["server_url"] = cls._server_manager.get_endpoint(model)
+            # Also inject cluster-specific max_tokens from ClusterServerConfig
+            if "cluster_max_tokens" not in kwargs:
+                from .cluster_server_config import ClusterServerConfig
+                cluster_config = ClusterServerConfig.for_model(model)
+                kwargs["cluster_max_tokens"] = cluster_config.max_tokens
         
         return service_class(model, **kwargs)

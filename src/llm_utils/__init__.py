@@ -11,10 +11,7 @@ from .base_llm_service import BaseLLMService
 from .llm_service_factory import LLMServiceFactory
 
 # Concrete service implementations
-from .openai_service import OpenAIService
-from .claude_service import ClaudeService
-from .google_service import GoogleService
-from .local_lm_service import LocalLMService
+from .llm_services import OpenAIService, ClaudeService, GoogleService, LocalLMService
 
 # Define what's exported
 __all__ = [
